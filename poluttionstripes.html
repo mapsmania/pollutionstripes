@@ -331,12 +331,15 @@
   };
 
   /* Helper to format key matching JSON */
+ 
+
   function getFormattedKey(props) {
-    const countyName = props.NAME || "";
-    const rawStateFips = String(props.STATE).padStart(2, '0');
-    const stateName = FIPS_TO_STATE[rawStateFips] || "";
-    return `${stateName}${countyName}`.replace(/[^a-zA-Z0-9]/g, '');
-  }
+  const countyName = (props.NAME || "").trim();
+  const rawStateFips = String(props.STATE).padStart(2, '0');
+  const stateName = (FIPS_TO_STATE[rawStateFips] || "").trim();
+
+  return `${stateName}${countyName}`;
+}
 
   /* =========================================
      MAP & DATA INITIALIZATION
@@ -415,15 +418,6 @@
         'line-opacity': 0.4
       }
     });
-
-    /* Helper to format key matching JSON reliably */
-function getFormattedKey(props) {
-  const countyName = (props.NAME || "").replace(/[^a-zA-Z0-9]/g, '');
-  const rawStateFips = String(props.STATE).padStart(2, '0');
-  const stateName = (FIPS_TO_STATE[rawStateFips] || "").replace(/[^a-zA-Z0-9]/g, '');
-  
-  return `${stateName}${countyName}`;
-}
 
 /* Click interaction */
 map.on('click', 'county-fills', (e) => {
