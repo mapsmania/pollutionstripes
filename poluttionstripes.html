@@ -336,19 +336,34 @@
   let pollutionData = {};
 
 
-  /* =========================================
-     AQI GRAYSCALE COLOUR SCALE
-     ========================================= */
+ /* =========================================
+   WARMING STRIPES COLOUR SCALE (BLUE TO RED)
+   ========================================= */
 
-  function getAQIColor(aqi) {
-    if (aqi === null || aqi === undefined) return '#333333'; // Missing data fallback
-    if (aqi < 30) return '#f8f9fa';  // Pristine / Good Air Quality
-    if (aqi < 40) return '#d1d5db';  // Light Gray / Good
-    if (aqi < 50) return '#9ca3af';  // Mid Gray / Moderate
-    if (aqi < 65) return '#4b5563';  // Dark Slate / Unhealthy for Sensitive Groups
-    if (aqi < 80) return '#1f2937';  // Deep Charcoal / Unhealthy
-    return '#0a0a0a';                 // Near Black / Severe Pollution
-  }
+// Ed Hawkins Classic Warming Stripes Palette (Deep Blue -> White -> Deep Red)
+const WARMING_STRIPES_PALETTE = [
+  '#08306b', // Very Clean / Far Below Average (Deep Navy)
+  '#2171b5', // Below Average (Dark Blue)
+  '#6baed6', // Moderately Below Average (Mid Blue)
+  '#c6dbef', // Slightly Below Average (Light Blue)
+  '#fcae91', // Slightly Above Average (Light Red/Pink)
+  '#fb6a4a', // Moderately Above Average (Mid Red)
+  '#cb181d', // Above Average (Dark Red)
+  '#67000d'  // Severe / Far Above Average (Deep Crimson)
+];
+
+function getWarmingStripeColor(val, minVal, maxVal) {
+  if (val === null || val === undefined || isNaN(val)) return '#333333'; // Missing data fallback
+
+  // Normalize value between 0.0 and 1.0 based on county range
+  let normalized = (val - minVal) / (maxVal - minVal || 1);
+  normalized = Math.max(0, Math.min(1, normalized)); // Clamp between 0 and 1
+
+  // Map to palette index
+  const index = Math.min(
+    Math.floor(normalized * WARMING_STRIPES_PALETTE.length),
+    WARMING_STRIPES_PALETTE.length - 1
+  );
 
 
   /* =========================================
