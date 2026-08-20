@@ -124,7 +124,6 @@
       background: #e5e5e5;
     }
 
-
     /* =========================================
        SHARE IMAGE
        ========================================= */
@@ -192,13 +191,11 @@
       color: #777;
     }
 
-
     /* =========================================
        MOBILE
        ========================================= */
 
     @media (max-width: 600px) {
-
       #stripe-panel {
         bottom: 10px;
         width: calc(100% - 20px);
@@ -220,9 +217,7 @@
       .aod-tooltip-stat {
         font-size: 11px;
       }
-
     }
-
   </style>
 </head>
 
@@ -230,37 +225,17 @@
 
 <div id="map"></div>
 
-
-<!-- =========================================
-     INTERACTIVE PANEL
-     ========================================= -->
-
+<!-- INTERACTIVE PANEL -->
 <div id="stripe-panel">
-
   <div class="panel-header">
-
     <div>
-      <h3 id="county-name" class="county-title">
-        Select a County
-      </h3>
-
-      <div class="data-subtitle">
-        EPA Annual Median AQI Air Pollution (2000–2025)
-      </div>
+      <h3 id="county-name" class="county-title">Select a County</h3>
+      <div class="data-subtitle">EPA Annual Median AQI Air Pollution (2000–2025)</div>
     </div>
-
-    <div id="smoke-stat" class="aod-tooltip-stat">
-      Hover or click a stripe
-    </div>
-
+    <div id="smoke-stat" class="aod-tooltip-stat">Hover or click a stripe</div>
   </div>
 
-
-  <div
-    class="stripes-container"
-    id="stripes">
-  </div>
-
+  <div class="stripes-container" id="stripes"></div>
 
   <div class="years-legend">
     <span>2000</span>
@@ -269,108 +244,103 @@
     <span>2025</span>
   </div>
 
-
   <div class="share-row">
-    <button id="share-stripes">
-      Share image
-    </button>
+    <button id="share-stripes">Share image</button>
   </div>
-
 </div>
 
-
-<!-- =========================================
-     DEDICATED SHARE CARD
-     ========================================= -->
-
+<!-- DEDICATED SHARE CARD -->
 <div id="stripes-share-card">
-
-  <div
-    class="share-card-title"
-    id="share-county-name">
-    County Pollution Stripes
-  </div>
-
-  <div class="share-card-subtitle">
-    EPA Annual Median AQI Air Pollution
-  </div>
-
-
-  <div
-    class="share-card-stripes"
-    id="share-stripes-container">
-  </div>
-
-
+  <div class="share-card-title" id="share-county-name">County Pollution Stripes</div>
+  <div class="share-card-subtitle">EPA Annual Median AQI Air Pollution</div>
+  <div class="share-card-stripes" id="share-stripes-container"></div>
   <div class="share-card-years">
     <span>2000</span>
     <span>2008</span>
     <span>2016</span>
     <span>2025</span>
   </div>
-
-
   <div class="share-card-footer">
-    <span>
-      Annual Median Air Quality Index (AQI)
-    </span>
-
-    <span>
-      EPA AirData · 2000–2025
-    </span>
+    <span>Annual Median Air Quality Index (AQI)</span>
+    <span>EPA AirData · 2000–2025</span>
   </div>
-
 </div>
-
 
 <!-- html2canvas -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-
 <script>
-
   /* =========================================
      GLOBAL DATA STORE
      ========================================= */
-
   let pollutionData = {};
 
+  /* =========================================
+     WARMING STRIPES COLOUR SCALE (BLUE TO RED)
+     ========================================= */
+  const WARMING_STRIPES_PALETTE = [
+    '#08306b', // Very Clean / Far Below Average (Deep Navy)
+    '#2171b5', // Below Average (Dark Blue)
+    '#6baed6', // Moderately Below Average (Mid Blue)
+    '#c6dbef', // Slightly Below Average (Light Blue)
+    '#fcae91', // Slightly Above Average (Light Red/Pink)
+    '#fb6a4a', // Moderately Above Average (Mid Red)
+    '#cb181d', // Above Average (Dark Red)
+    '#67000d'  // Severe / Far Above Average (Deep Crimson)
+  ];
 
- /* =========================================
-   WARMING STRIPES COLOUR SCALE (BLUE TO RED)
-   ========================================= */
+  function getWarmingStripeColor(val, minVal, maxVal) {
+    if (val === null || val === undefined || isNaN(val)) return '#333333';
+    let normalized = (val - minVal) / (maxVal - minVal || 1);
+    normalized = Math.max(0, Math.min(1, normalized));
+    const index = Math.min(
+      Math.floor(normalized * WARMING_STRIPES_PALETTE.length),
+      WARMING_STRIPES_PALETTE.length - 1
+    );
+    return WARMING_STRIPES_PALETTE[index];
+  }
 
-// Ed Hawkins Classic Warming Stripes Palette (Deep Blue -> White -> Deep Red)
-const WARMING_STRIPES_PALETTE = [
-  '#08306b', // Very Clean / Far Below Average (Deep Navy)
-  '#2171b5', // Below Average (Dark Blue)
-  '#6baed6', // Moderately Below Average (Mid Blue)
-  '#c6dbef', // Slightly Below Average (Light Blue)
-  '#fcae91', // Slightly Above Average (Light Red/Pink)
-  '#fb6a4a', // Moderately Above Average (Mid Red)
-  '#cb181d', // Above Average (Dark Red)
-  '#67000d'  // Severe / Far Above Average (Deep Crimson)
-];
+  /* Fixed palette scale for national map rendering */
+  function getAbsoluteAQIColor(aqi) {
+    if (aqi === null || aqi === undefined || isNaN(aqi)) return '#4a5568';
+    if (aqi < 32) return '#08306b';
+    if (aqi < 38) return '#2171b5';
+    if (aqi < 44) return '#6baed6';
+    if (aqi < 50) return '#c6dbef';
+    if (aqi < 56) return '#fcae91';
+    if (aqi < 64) return '#fb6a4a';
+    if (aqi < 74) return '#cb181d';
+    return '#67000d';
+  }
 
-function getWarmingStripeColor(val, minVal, maxVal) {
-  if (val === null || val === undefined || isNaN(val)) return '#333333'; // Missing data fallback
+  /* =========================================
+     STATE LOOKUP TABLE
+     ========================================= */
+  const FIPS_TO_STATE = {
+    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
+    "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
+    "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
+    "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
+    "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
+    "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska", "32": "Nevada",
+    "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico", "36": "New York",
+    "37": "North Carolina", "38": "North Dakota", "39": "Ohio", "40": "Oklahoma",
+    "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island", "45": "South Carolina",
+    "46": "South Dakota", "47": "Tennessee", "48": "Texas", "49": "Utah", "50": "Vermont",
+    "51": "Virginia", "53": "Washington", "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming"
+  };
 
-  // Normalize value between 0.0 and 1.0 based on county range
-  let normalized = (val - minVal) / (maxVal - minVal || 1);
-  normalized = Math.max(0, Math.min(1, normalized)); // Clamp between 0 and 1
-
-  // Map to palette index
-  const index = Math.min(
-    Math.floor(normalized * WARMING_STRIPES_PALETTE.length),
-    WARMING_STRIPES_PALETTE.length - 1
-  );
-return WARMING_STRIPES_PALETTE[index];
-}
+  /* Helper to format key matching JSON */
+  function getFormattedKey(props) {
+    const countyName = props.NAME || "";
+    const rawStateFips = String(props.STATE).padStart(2, '0');
+    const stateName = FIPS_TO_STATE[rawStateFips] || "";
+    return `${stateName}${countyName}`.replace(/[^a-zA-Z0-9]/g, '');
+  }
 
   /* =========================================
      MAP & DATA INITIALIZATION
      ========================================= */
-
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/bright',
@@ -378,10 +348,8 @@ return WARMING_STRIPES_PALETTE[index];
     zoom: 4
   });
 
-
   map.on('load', async () => {
-
-    /* Fetch the 2000-2025 pollution JSON file */
+    /* Fetch pollution dataset */
     try {
       const response = await fetch('./county_annual_pollution_2000_2025.json');
       pollutionData = await response.json();
@@ -389,25 +357,46 @@ return WARMING_STRIPES_PALETTE[index];
       console.error('Failed to load county_annual_pollution_2000_2025.json:', err);
     }
 
+    /* Load county boundaries GeoJSON */
+    const geojsonRes = await fetch('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json');
+    const countiesGeoJSON = await geojsonRes.json();
 
-    /* County boundaries GeoJSON */
-    map.addSource('counties', {
-      type: 'geojson',
-      data: 'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+    /* Build MapLibre match expression for dynamic choropleth fills */
+    const matchExpression = ['match', ['get', 'MAP_KEY']];
+
+    countiesGeoJSON.features.forEach(feature => {
+      const key = getFormattedKey(feature.properties);
+      feature.properties.MAP_KEY = key;
+
+      if (pollutionData[key]) {
+        const annualMap = pollutionData[key];
+        const values = Object.values(annualMap).filter(v => v !== null && !isNaN(v));
+        if (values.length) {
+          const avg = values.reduce((a, b) => a + b, 0) / values.length;
+          matchExpression.push(key, getAbsoluteAQIColor(avg));
+        }
+      }
     });
 
+    // Default fallback color for missing counties
+    matchExpression.push('#2a2a2a');
 
-    /* County fills */
+    /* Add GeoJSON source with appended MAP_KEY properties */
+    map.addSource('counties', {
+      type: 'geojson',
+      data: countiesGeoJSON
+    });
+
+    /* County fills with choropleth expression */
     map.addLayer({
       id: 'county-fills',
       type: 'fill',
       source: 'counties',
       paint: {
-        'fill-color': '#4a5568',
-        'fill-opacity': 0.3
+        'fill-color': matchExpression,
+        'fill-opacity': 0.75
       }
     });
-
 
     /* County borders */
     map.addLayer({
@@ -416,50 +405,29 @@ return WARMING_STRIPES_PALETTE[index];
       source: 'counties',
       paint: {
         'line-color': '#ffffff',
-        'line-width': 0.4,
-        'line-opacity': 0.6
+        'line-width': 0.3,
+        'line-opacity': 0.4
       }
     });
 
+    /* Click interaction */
+    map.on('click', 'county-fills', (e) => {
+      const feature = e.features[0];
+      const props = feature.properties;
+      const countyName = props.NAME || "Selected County";
+      const rawStateFips = String(props.STATE).padStart(2, '0');
+      const stateName = FIPS_TO_STATE[rawStateFips] || "";
+      const key = props.MAP_KEY;
 
-    /* County selection */
- // State FIPS code to Full State Name mapping
-const FIPS_TO_STATE = {
-  "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
-  "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
-  "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
-  "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
-  "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
-  "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska", "32": "Nevada",
-  "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico", "36": "New York",
-  "37": "North Carolina", "38": "North Dakota", "39": "Ohio", "40": "Oklahoma",
-  "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island", "45": "South Carolina",
-  "46": "South Dakota", "47": "Tennessee", "48": "Texas", "49": "Utah", "50": "Vermont",
-  "51": "Virginia", "53": "Washington", "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming"
-};
+      const countyPollution = pollutionData[key];
 
-map.on('click', 'county-fills', (e) => {
-  const feature = e.features[0];
-  const props = feature.properties;
+      if (!countyPollution) {
+        alert(`No historical pollution data found for ${countyName} (Key tried: "${key}").`);
+        return;
+      }
 
-  const countyName = props.NAME || "Selected County";
-  
-  // Get 2-digit state FIPS (e.g., "29" for Missouri)
-  const rawStateFips = String(props.STATE).padStart(2, '0');
-  const stateName = FIPS_TO_STATE[rawStateFips] || "";
-
-  // Format key to match "MissouriCass" (stripping spaces, hyphens, and apostrophes)
-  const key = `${stateName}${countyName}`.replace(/[^a-zA-Z0-9]/g, '');
-
-  const countyPollution = pollutionData[key];
-
-  if (!countyPollution) {
-    alert(`No historical pollution data found for ${countyName} (Key tried: "${key}").`);
-    return;
-  }
-
-  renderPollutionStripes(`${countyName} County, ${stateName}`, countyPollution);
-});
+      renderPollutionStripes(`${countyName} County, ${stateName}`, countyPollution);
+    });
 
     /* Cursor states */
     map.on('mouseenter', 'county-fills', () => {
@@ -469,99 +437,78 @@ map.on('click', 'county-fills', (e) => {
     map.on('mouseleave', 'county-fills', () => {
       map.getCanvas().style.cursor = '';
     });
-
   });
 
+  /* =========================================
+     RENDER STRIPES FUNCTION
+     ========================================= */
+  function renderPollutionStripes(name, annualMap) {
+    const panel = document.getElementById('stripe-panel');
+    const container = document.getElementById('stripes');
+    const nameEl = document.getElementById('county-name');
+    const statEl = document.getElementById('smoke-stat');
 
- /* =========================================
-   UPDATED RENDER STRIPES FUNCTION
-   ========================================= */
+    panel.style.display = 'block';
+    nameEl.textContent = name;
 
-function renderPollutionStripes(name, annualMap) {
+    const sortedYears = Object.keys(annualMap).sort((a, b) => Number(a) - Number(b));
+    const values = sortedYears.map(yr => annualMap[yr]).filter(v => v !== null && !isNaN(v));
 
-  const panel = document.getElementById('stripe-panel');
-  const container = document.getElementById('stripes');
-  const nameEl = document.getElementById('county-name');
-  const statEl = document.getElementById('smoke-stat');
+    const minAQI = Math.min(...values);
+    const maxAQI = Math.max(...values);
+    const avgAQI = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
 
-  panel.style.display = 'block';
-  nameEl.textContent = name;
+    statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
 
-  // Sort timeline years
-  const sortedYears = Object.keys(annualMap).sort((a, b) => Number(a) - Number(b));
-  const values = sortedYears.map(yr => annualMap[yr]).filter(v => v !== null && !isNaN(v));
+    /* Interactive panel stripes */
+    container.innerHTML = '';
+    sortedYears.forEach(year => {
+      const aqi = annualMap[year];
+      const bar = document.createElement('div');
+      
+      bar.className = 'stripe-bar';
+      bar.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
 
-  // Compute county minimum, maximum, and average for relative scaling
-  const minAQI = Math.min(...values);
-  const maxAQI = Math.max(...values);
-  const avgAQI = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
+      bar.addEventListener('mouseenter', () => {
+        statEl.textContent = `${year}: ${aqi !== null ? Math.round(aqi) + ' AQI' : 'No Data'}`;
+      });
 
-  statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
+      bar.addEventListener('mouseleave', () => {
+        statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
+      });
 
-   /* =====================================
-     INTERACTIVE STRIPES
-     ===================================== */
-
-  container.innerHTML = '';
-
-  sortedYears.forEach(year => {
-    const aqi = annualMap[year];
-    const bar = document.createElement('div');
-    
-    bar.className = 'stripe-bar';
-    bar.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
-
-    bar.addEventListener('mouseenter', () => {
-      statEl.textContent = `${year}: ${aqi !== null ? Math.round(aqi) + ' AQI' : 'No Data'}`;
+      container.appendChild(bar);
     });
 
-    bar.addEventListener('mouseleave', () => {
-      statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
+    /* Build share card */
+    document.getElementById('share-county-name').textContent = `${name} Pollution Stripes`;
+
+    const shareContainer = document.getElementById('share-stripes-container');
+    shareContainer.innerHTML = '';
+
+    sortedYears.forEach(year => {
+      const aqi = annualMap[year];
+      const stripe = document.createElement('div');
+      stripe.className = 'share-card-stripe';
+      stripe.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
+      shareContainer.appendChild(stripe);
     });
-
-    container.appendChild(bar);
-  });
-
-
-  /* =====================================
-     BUILD SHARE CARD
-     ===================================== */
-
-  document.getElementById('share-county-name').textContent = 
-    `${name} Pollution Stripes`;
-
-  const shareContainer = document.getElementById('share-stripes-container');
-  shareContainer.innerHTML = '';
-
-  sortedYears.forEach(year => {
-    const aqi = annualMap[year];
-    const stripe = document.createElement('div');
-    stripe.className = 'share-card-stripe';
-    stripe.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
-    shareContainer.appendChild(stripe);
-  });
-
-}
+  }
 
   /* =========================================
      SHARE IMAGE GENERATION
      ========================================= */
-
   document.getElementById('share-stripes').addEventListener('click', async () => {
-
     const card = document.getElementById('stripes-share-card');
     const name = document.getElementById('county-name').textContent;
 
-    /* Render off-screen share card to canvas */
     const canvas = await html2canvas(card, {
       backgroundColor: '#121212',
       scale: 2,
       useCORS: true
     });
 
-    /* Convert canvas to PNG Blob */
     canvas.toBlob(async (blob) => {
-
       if (!blob) return;
 
       const file = new File(
@@ -570,7 +517,6 @@ function renderPollutionStripes(name, annualMap) {
         { type: 'image/png' }
       );
 
-      /* Web Share API (Mobile / Modern Browsers) */
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
@@ -584,18 +530,14 @@ function renderPollutionStripes(name, annualMap) {
         }
       }
 
-      /* Fallback direct download */
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = file.name;
       link.click();
       URL.revokeObjectURL(url);
-
     }, 'image/png');
-
   });
-
 </script>
 
 </body>
