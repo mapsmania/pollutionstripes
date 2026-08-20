@@ -363,17 +363,23 @@
 
     /* Build MapLibre match expression for dynamic choropleth fills */
     const matchExpression = ['match', ['get', 'MAP_KEY']];
+    const processedKeys = new Set();
 
     countiesGeoJSON.features.forEach(feature => {
       const key = getFormattedKey(feature.properties);
       feature.properties.MAP_KEY = key;
 
-      if (pollutionData[key]) {
-        const annualMap = pollutionData[key];
-        const values = Object.values(annualMap).filter(v => v !== null && !isNaN(v));
-        if (values.length) {
-          const avg = values.reduce((a, b) => a + b, 0) / values.length;
-          matchExpression.push(key, getAbsoluteAQIColor(avg));
+      // Ensure key is non-empty and processed only ONCE to prevent duplicate match branch error
+      if (key && !processedKeys.has(key)) {
+        processedKeys.add(key);
+
+        if (pollutionData[key]) {
+          const annualMap = pollutionData[key];
+          const values = Object.values(annualMap).filter(v => v !== null && !isNaN(v));
+          if (values.length) {
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            matchExpression.push(key, getAbsoluteAQIColor(avg));
+          }
         }
       }
     });
