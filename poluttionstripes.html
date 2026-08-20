@@ -416,24 +416,35 @@
       }
     });
 
-    /* Click interaction */
-    map.on('click', 'county-fills', (e) => {
-      const feature = e.features[0];
-      const props = feature.properties;
-      const countyName = props.NAME || "Selected County";
-      const rawStateFips = String(props.STATE).padStart(2, '0');
-      const stateName = FIPS_TO_STATE[rawStateFips] || "";
-      const key = props.MAP_KEY;
+    /* Helper to format key matching JSON reliably */
+function getFormattedKey(props) {
+  const countyName = (props.NAME || "").replace(/[^a-zA-Z0-9]/g, '');
+  const rawStateFips = String(props.STATE).padStart(2, '0');
+  const stateName = (FIPS_TO_STATE[rawStateFips] || "").replace(/[^a-zA-Z0-9]/g, '');
+  
+  return `${stateName}${countyName}`;
+}
 
-      const countyPollution = pollutionData[key];
+/* Click interaction */
+map.on('click', 'county-fills', (e) => {
+  const feature = e.features[0];
+  const props = feature.properties;
+  const countyName = props.NAME || "Selected County";
+  const rawStateFips = String(props.STATE).padStart(2, '0');
+  const stateName = FIPS_TO_STATE[rawStateFips] || "";
+  
+  // Clean key generation matching getFormattedKey
+  const key = getFormattedKey(props);
 
-      if (!countyPollution) {
-        alert(`No historical pollution data found for ${countyName} (Key tried: "${key}").`);
-        return;
-      }
+  const countyPollution = pollutionData[key];
 
-      renderPollutionStripes(`${countyName} County, ${stateName}`, countyPollution);
-    });
+  if (!countyPollution) {
+    alert(`No historical pollution data found for ${countyName} (Key tried: "${key}").`);
+    return;
+  }
+
+  renderPollutionStripes(`${countyName} County, ${stateName}`, countyPollution);
+});
 
     /* Cursor states */
     map.on('mouseenter', 'county-fills', () => {
