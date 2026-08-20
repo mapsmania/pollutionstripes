@@ -363,7 +363,7 @@
   map.on('load', async () => {
     /* Fetch pollution dataset */
     try {
-      const response = await fetch('./county_annual_pollution_2000_2025.json');
+      const response = await fetch('./county_annual_pollution_fips.json');
       pollutionData = await response.json();
     } catch (err) {
       console.error('Failed to load county_annual_pollution_2000_2025.json:', err);
