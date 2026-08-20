@@ -408,22 +408,25 @@
 
     /* County selection */
     map.on('click', 'county-fills', (e) => {
-      const feature = e.features[0];
-      const countyName = feature.properties.NAME || "Selected County";
-      
-      // Ensure 5-digit FIPS padding to match JSON keys (e.g., '06037')
-      const rawFips = String(feature.id || feature.properties.STATE + feature.properties.COUNTY);
-      const fips = rawFips.padStart(5, '0');
+  const feature = e.features[0];
+  const props = feature.properties;
 
-      const countyPollution = pollutionData[fips];
+  // Extract county name and state (requires state name mapping if props only has STATE FIPS)
+  const countyName = props.NAME || "Selected County";
+  const stateName = props.STATE_NAME || ""; // Check your GeoJSON property name for state
 
-      if (!countyPollution) {
-        alert(`No historical pollution data found for ${countyName} (FIPS: ${fips}).`);
-        return;
-      }
+  // Format key to match "AlabamaBaldwin" (remove spaces/punctuation)
+  const key = `${stateName}${countyName}`.replace(/[^a-zA-Z]/g, '');
 
-      renderPollutionStripes(countyName, countyPollution);
-    });
+  const countyPollution = pollutionData[key];
+
+  if (!countyPollution) {
+    alert(`No historical pollution data found for ${countyName} (Key: ${key}).`);
+    return;
+  }
+
+  renderPollutionStripes(countyName, countyPollution);
+});
 
 
     /* Cursor states */
