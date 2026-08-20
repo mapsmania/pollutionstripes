@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>US County Pollution Stripes (2000–2025)</title>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* =========================================
+       INTERACTIVE STRIPE PANEL
+       ========================================= */
+
+    #stripe-panel {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(18, 18, 18, 0.92);
+      color: #fff;
+      padding: 18px 22px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      width: 90%;
+      max-width: 800px;
+      display: none;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-sizing: border-box;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .county-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .data-subtitle {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stripes-container {
+      display: flex;
+      height: 200px;
+      width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stripe-bar {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      transition: opacity 0.15s ease;
+      cursor: pointer;
+    }
+
+    .stripe-bar:hover {
+      opacity: 0.75;
+      outline: 1px solid #fff;
+      z-index: 2;
+    }
+
+    .years-legend {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 6px;
+    }
+
+    .aod-tooltip-stat {
+      font-size: 13px;
+      color: #38bdf8;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .share-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    #share-stripes {
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      background: #fff;
+      color: #111;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #share-stripes:hover {
+      background: #e5e5e5;
+    }
+
+
+    /* =========================================
+       SHARE IMAGE
+       ========================================= */
+
+    #stripes-share-card {
+      position: fixed;
+      left: -99999px;
+      top: 0;
+
+      width: 1200px;
+      height: 675px;
+      box-sizing: border-box;
+
+      padding: 55px 65px;
+
+      background: #121212;
+      color: #fff;
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .share-card-title {
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .share-card-subtitle {
+      font-size: 18px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .share-card-stripes {
+      display: flex;
+      width: 100%;
+      height: 330px;
+      margin-top: 35px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .share-card-stripe {
+      flex: 1;
+      height: 100%;
+    }
+
+    .share-card-years {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+      color: #999;
+      margin-top: 10px;
+    }
+
+    .share-card-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 38px;
+      padding-top: 18px;
+      border-top: 1px solid #333;
+      font-size: 14px;
+      color: #777;
+    }
+
+
+    /* =========================================
+       MOBILE
+       ========================================= */
+
+    @media (max-width: 600px) {
+
+      #stripe-panel {
+        bottom: 10px;
+        width: calc(100% - 20px);
+        padding: 14px;
+      }
+
+      .stripes-container {
+        height: 150px;
+      }
+
+      .panel-header {
+        gap: 10px;
+      }
+
+      .county-title {
+        font-size: 16px;
+      }
+
+      .aod-tooltip-stat {
+        font-size: 11px;
+      }
+
+    }
+
+  </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+
+<!-- =========================================
+     INTERACTIVE PANEL
+     ========================================= -->
+
+<div id="stripe-panel">
+
+  <div class="panel-header">
+
+    <div>
+      <h3 id="county-name" class="county-title">
+        Select a County
+      </h3>
+
+      <div class="data-subtitle">
+        EPA Annual Median AQI Air Pollution (2000–2025)
+      </div>
+    </div>
+
+    <div id="smoke-stat" class="aod-tooltip-stat">
+      Hover or click a stripe
+    </div>
+
+  </div>
+
+
+  <div
+    class="stripes-container"
+    id="stripes">
+  </div>
+
+
+  <div class="years-legend">
+    <span>2000</span>
+    <span>2008</span>
+    <span>2016</span>
+    <span>2025</span>
+  </div>
+
+
+  <div class="share-row">
+    <button id="share-stripes">
+      Share image
+    </button>
+  </div>
+
+</div>
+
+
+<!-- =========================================
+     DEDICATED SHARE CARD
+     ========================================= -->
+
+<div id="stripes-share-card">
+
+  <div
+    class="share-card-title"
+    id="share-county-name">
+    County Pollution Stripes
+  </div>
+
+  <div class="share-card-subtitle">
+    EPA Annual Median AQI Air Pollution
+  </div>
+
+
+  <div
+    class="share-card-stripes"
+    id="share-stripes-container">
+  </div>
+
+
+  <div class="share-card-years">
+    <span>2000</span>
+    <span>2008</span>
+    <span>2016</span>
+    <span>2025</span>
+  </div>
+
+
+  <div class="share-card-footer">
+    <span>
+      Annual Median Air Quality Index (AQI)
+    </span>
+
+    <span>
+      EPA AirData · 2000–2025
+    </span>
+  </div>
+
+</div>
+
+
+<!-- html2canvas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
+<script>
+
+  /* =========================================
+     GLOBAL DATA STORE
+     ========================================= */
+
+  let pollutionData = {};
+
+
+  /* =========================================
+     AQI GRAYSCALE COLOUR SCALE
+     ========================================= */
+
+  function getAQIColor(aqi) {
+    if (aqi === null || aqi === undefined) return '#333333'; // Missing data fallback
+    if (aqi < 30) return '#f8f9fa';  // Pristine / Good Air Quality
+    if (aqi < 40) return '#d1d5db';  // Light Gray / Good
+    if (aqi < 50) return '#9ca3af';  // Mid Gray / Moderate
+    if (aqi < 65) return '#4b5563';  // Dark Slate / Unhealthy for Sensitive Groups
+    if (aqi < 80) return '#1f2937';  // Deep Charcoal / Unhealthy
+    return '#0a0a0a';                 // Near Black / Severe Pollution
+  }
+
+
+  /* =========================================
+     MAP & DATA INITIALIZATION
+     ========================================= */
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/bright',
+    center: [-98.5795, 39.8283],
+    zoom: 4
+  });
+
+
+  map.on('load', async () => {
+
+    /* Fetch the 2000-2025 pollution JSON file */
+    try {
+      const response = await fetch('./county_annual_pollution_2000_2025.json');
+      pollutionData = await response.json();
+    } catch (err) {
+      console.error('Failed to load county_annual_pollution_2000_2025.json:', err);
+    }
+
+
+    /* County boundaries GeoJSON */
+    map.addSource('counties', {
+      type: 'geojson',
+      data: 'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+    });
+
+
+    /* County fills */
+    map.addLayer({
+      id: 'county-fills',
+      type: 'fill',
+      source: 'counties',
+      paint: {
+        'fill-color': '#4a5568',
+        'fill-opacity': 0.3
+      }
+    });
+
+
+    /* County borders */
+    map.addLayer({
+      id: 'county-borders',
+      type: 'line',
+      source: 'counties',
+      paint: {
+        'line-color': '#ffffff',
+        'line-width': 0.4,
+        'line-opacity': 0.6
+      }
+    });
+
+
+    /* County selection */
+    map.on('click', 'county-fills', (e) => {
+      const feature = e.features[0];
+      const countyName = feature.properties.NAME || "Selected County";
+      
+      // Ensure 5-digit FIPS padding to match JSON keys (e.g., '06037')
+      const rawFips = String(feature.id || feature.properties.STATE + feature.properties.COUNTY);
+      const fips = rawFips.padStart(5, '0');
+
+      const countyPollution = pollutionData[fips];
+
+      if (!countyPollution) {
+        alert(`No historical pollution data found for ${countyName} (FIPS: ${fips}).`);
+        return;
+      }
+
+      renderPollutionStripes(countyName, countyPollution);
+    });
+
+
+    /* Cursor states */
+    map.on('mouseenter', 'county-fills', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'county-fills', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+  });
+
+
+  /* =========================================
+     RENDER STRIPES
+     ========================================= */
+
+  function renderPollutionStripes(name, annualMap) {
+
+    const panel = document.getElementById('stripe-panel');
+    const container = document.getElementById('stripes');
+    const nameEl = document.getElementById('county-name');
+    const statEl = document.getElementById('smoke-stat');
+
+    /* Show interactive panel */
+    panel.style.display = 'block';
+    nameEl.textContent = name;
+
+    // Convert object { "2000": 42, "2001": 39, ... } to sorted array
+    const sortedYears = Object.keys(annualMap).sort((a, b) => Number(a) - Number(b));
+    const values = sortedYears.map(yr => annualMap[yr]);
+
+    /* Calculate 26-year median AQI average */
+    const validValues = values.filter(v => v !== null && !isNaN(v));
+    const avgAQI = validValues.length 
+      ? (validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(1) 
+      : 'N/A';
+
+    statEl.textContent = `26-Yr Mean Median AQI: ${avgAQI}`;
+
+
+    /* =====================================
+       INTERACTIVE STRIPES
+       ===================================== */
+
+    container.innerHTML = '';
+
+    sortedYears.forEach(year => {
+      const aqi = annualMap[year];
+      const bar = document.createElement('div');
+      
+      bar.className = 'stripe-bar';
+      bar.style.backgroundColor = getAQIColor(aqi);
+
+      /* Hover information */
+      bar.addEventListener('mouseenter', () => {
+        statEl.textContent = `${year}: ${aqi !== null ? Math.round(aqi) + ' AQI' : 'No Data'}`;
+      });
+
+      bar.addEventListener('mouseleave', () => {
+        statEl.textContent = `26-Yr Mean Median AQI: ${avgAQI}`;
+      });
+
+      container.appendChild(bar);
+    });
+
+
+    /* =====================================
+       BUILD SHARE CARD
+       ===================================== */
+
+    document.getElementById('share-county-name').textContent = 
+      `${name} County Pollution Stripes`;
+
+    const shareContainer = document.getElementById('share-stripes-container');
+    shareContainer.innerHTML = '';
+
+    sortedYears.forEach(year => {
+      const aqi = annualMap[year];
+      const stripe = document.createElement('div');
+      stripe.className = 'share-card-stripe';
+      stripe.style.backgroundColor = getAQIColor(aqi);
+      shareContainer.appendChild(stripe);
+    });
+
+  }
+
+
+  /* =========================================
+     SHARE IMAGE GENERATION
+     ========================================= */
+
+  document.getElementById('share-stripes').addEventListener('click', async () => {
+
+    const card = document.getElementById('stripes-share-card');
+    const name = document.getElementById('county-name').textContent;
+
+    /* Render off-screen share card to canvas */
+    const canvas = await html2canvas(card, {
+      backgroundColor: '#121212',
+      scale: 2,
+      useCORS: true
+    });
+
+    /* Convert canvas to PNG Blob */
+    canvas.toBlob(async (blob) => {
+
+      if (!blob) return;
+
+      const file = new File(
+        [blob],
+        `${name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-pollution-stripes.png`,
+        { type: 'image/png' }
+      );
+
+      /* Web Share API (Mobile / Modern Browsers) */
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: `${name} Pollution Stripes`,
+            text: 'EPA Annual Median AQI Air Pollution, 2000–2025',
+            files: [file]
+          });
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      /* Fallback direct download */
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      URL.revokeObjectURL(url);
+
+    }, 'image/png');
+
+  });
+
+</script>
+
+</body>
+</html>
