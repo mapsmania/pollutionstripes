@@ -473,80 +473,75 @@ map.on('click', 'county-fills', (e) => {
   });
 
 
-  /* =========================================
-     RENDER STRIPES
-     ========================================= */
+ /* =========================================
+   UPDATED RENDER STRIPES FUNCTION
+   ========================================= */
 
-  function renderPollutionStripes(name, annualMap) {
+function renderPollutionStripes(name, annualMap) {
 
-    const panel = document.getElementById('stripe-panel');
-    const container = document.getElementById('stripes');
-    const nameEl = document.getElementById('county-name');
-    const statEl = document.getElementById('smoke-stat');
+  const panel = document.getElementById('stripe-panel');
+  const container = document.getElementById('stripes');
+  const nameEl = document.getElementById('county-name');
+  const statEl = document.getElementById('smoke-stat');
 
-    /* Show interactive panel */
-    panel.style.display = 'block';
-    nameEl.textContent = name;
+  panel.style.display = 'block';
+  nameEl.textContent = name;
 
-    // Convert object { "2000": 42, "2001": 39, ... } to sorted array
-    const sortedYears = Object.keys(annualMap).sort((a, b) => Number(a) - Number(b));
-    const values = sortedYears.map(yr => annualMap[yr]);
+  // Sort timeline years
+  const sortedYears = Object.keys(annualMap).sort((a, b) => Number(a) - Number(b));
+  const values = sortedYears.map(yr => annualMap[yr]).filter(v => v !== null && !isNaN(v));
 
-    /* Calculate 26-year median AQI average */
-    const validValues = values.filter(v => v !== null && !isNaN(v));
-    const avgAQI = validValues.length 
-      ? (validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(1) 
-      : 'N/A';
+  // Compute county minimum, maximum, and average for relative scaling
+  const minAQI = Math.min(...values);
+  const maxAQI = Math.max(...values);
+  const avgAQI = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
 
-    statEl.textContent = `26-Yr Mean Median AQI: ${avgAQI}`;
+  statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
 
+   /* =====================================
+     INTERACTIVE STRIPES
+     ===================================== */
 
-    /* =====================================
-       INTERACTIVE STRIPES
-       ===================================== */
+  container.innerHTML = '';
 
-    container.innerHTML = '';
+  sortedYears.forEach(year => {
+    const aqi = annualMap[year];
+    const bar = document.createElement('div');
+    
+    bar.className = 'stripe-bar';
+    bar.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
 
-    sortedYears.forEach(year => {
-      const aqi = annualMap[year];
-      const bar = document.createElement('div');
-      
-      bar.className = 'stripe-bar';
-      bar.style.backgroundColor = getAQIColor(aqi);
-
-      /* Hover information */
-      bar.addEventListener('mouseenter', () => {
-        statEl.textContent = `${year}: ${aqi !== null ? Math.round(aqi) + ' AQI' : 'No Data'}`;
-      });
-
-      bar.addEventListener('mouseleave', () => {
-        statEl.textContent = `26-Yr Mean Median AQI: ${avgAQI}`;
-      });
-
-      container.appendChild(bar);
+    bar.addEventListener('mouseenter', () => {
+      statEl.textContent = `${year}: ${aqi !== null ? Math.round(aqi) + ' AQI' : 'No Data'}`;
     });
 
-
-    /* =====================================
-       BUILD SHARE CARD
-       ===================================== */
-
-    document.getElementById('share-county-name').textContent = 
-      `${name} County Pollution Stripes`;
-
-    const shareContainer = document.getElementById('share-stripes-container');
-    shareContainer.innerHTML = '';
-
-    sortedYears.forEach(year => {
-      const aqi = annualMap[year];
-      const stripe = document.createElement('div');
-      stripe.className = 'share-card-stripe';
-      stripe.style.backgroundColor = getAQIColor(aqi);
-      shareContainer.appendChild(stripe);
+    bar.addEventListener('mouseleave', () => {
+      statEl.textContent = `26-Yr Mean AQI: ${avgAQI}`;
     });
 
-  }
+    container.appendChild(bar);
+  });
 
+
+  /* =====================================
+     BUILD SHARE CARD
+     ===================================== */
+
+  document.getElementById('share-county-name').textContent = 
+    `${name} Pollution Stripes`;
+
+  const shareContainer = document.getElementById('share-stripes-container');
+  shareContainer.innerHTML = '';
+
+  sortedYears.forEach(year => {
+    const aqi = annualMap[year];
+    const stripe = document.createElement('div');
+    stripe.className = 'share-card-stripe';
+    stripe.style.backgroundColor = getWarmingStripeColor(aqi, minAQI, maxAQI);
+    shareContainer.appendChild(stripe);
+  });
+
+}
 
   /* =========================================
      SHARE IMAGE GENERATION
